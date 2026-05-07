@@ -1,59 +1,54 @@
-"""High-level linting API that ties parser, validator, and summarizer together."""
+"""High-level lint API combining parsing, validation, summarization, and normalization."""
 
-import json
-from typing import List, Optional
+from typing import List
 
-from crontab_lint.parser import parse
-from crontab_lint.validator import validate
+from crontab_lint.parser import parse, ParsedCron
+from crontab_lint.validator import validate, ValidationResult
 from crontab_lint.summarizer import summarize
 from crontab_lint.formatter import LintResult, format_text, format_json
+from crontab_lint.normalizer import normalize
 
 
 def lint(expression: str) -> LintResult:
-    """Lint a single cron expression and return a structured LintResult."""
+    """Lint a single crontab expression and return a structured result."""
     try:
-        parsed = parse(expression)
+        parsed: ParsedCron = parse(expression)
     except Exception as exc:  # noqa: BLE001
-        from crontab_lint.validator import ValidationResult
-
-        validation = ValidationResult(
-            is_valid=False,
-            errors=[f"Parse error: {exc}"],
-            warnings=[],
-        )
         return LintResult(
             expression=expression,
-            parsed=None,
-            validation=validation,
+            is_valid=False,
+            errors=[f"Parse error: {exc}"],
             summary=None,
+            normalized=None,
         )
 
-    validation = validate(parsed)
-    summary: Optional[str] = None
-    if validation.is_valid:
-        try:
-            summary = summarize(parsed)
-        except Exception:  # noqa: BLE001
-            summary = None
+    result: ValidationResult = validate(parsed)
+    summary = summarize(parsed) if result.is_valid else None
+
+    try:
+        normalized = normalize(expression) if result.is_valid else None
+    except Exception:  # noqa: BLE001
+        normalized = None
 
     return LintResult(
         expression=expression,
-        parsed=parsed,
-        validation=validation,
+        is_valid=result.is_valid,
+        errors=result.errors,
         summary=summary,
+        normalized=normalized,
     )
 
 
 def lint_many(expressions: List[str]) -> List[LintResult]:
-    """Lint multiple cron expressions and return a list of LintResults."""
+    """Lint multiple crontab expressions and return a list of results."""
     return [lint(expr) for expr in expressions]
 
 
 def lint_to_text(expression: str) -> str:
-    """Convenience wrapper: lint and return plain-text output."""
+    """Lint an expression and return a human-readable text report."""
     return format_text(lint(expression))
 
 
 def lint_to_json(expression: str) -> str:
-    """Convenience wrapper: lint and return JSON string output."""
-    return json.dumps(format_json(lint(expression)), indent=2)
+    """Lint an expression and return a JSON-encoded report."""
+    return format_json(lint(expression))
