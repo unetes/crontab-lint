@@ -70,3 +70,19 @@ def normalize(expression: str) -> str:
     dow = _normalize_field(dow, WEEKDAY_NAMES)
 
     return f"{minute} {hour} {dom} {month} {dow}"
+
+
+def are_equivalent(expr_a: str, expr_b: str) -> bool:
+    """Return True if two crontab expressions are semantically equivalent.
+
+    Equivalence is determined by comparing the normalized forms of both
+    expressions, so differences in whitespace, name aliases (e.g. 'jan' vs
+    '1'), and comma-list ordering are ignored.
+
+    Examples::
+
+        are_equivalent("@daily", "0 0 * * *")       # True
+        are_equivalent("0 0 1 jan *", "0 0 1 1 *")  # True
+        are_equivalent("0 0 * * mon", "0 0 * * 2")  # False
+    """
+    return normalize(expr_a) == normalize(expr_b)
